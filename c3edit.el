@@ -207,6 +207,26 @@ alist."
        (t
         (move-overlay overlay (1+ point) (+ 2 point)))))))
 
+(defun c3edit--handle-selection-update (doc-id peer-id point mark)
+  "Update selection for PEER-ID in document DOC-ID for new POINT and MARK."
+  (let* ((data (rassoc doc-id c3edit--buffers))
+         (buffer (car data))
+         (id (cdr data))
+         (overlay (cdr (assoc id c3edit--cursors-alist))))
+    (with-current-buffer buffer
+      (cond
+       ;; Our selection
+       ((not peer-id)
+        (goto-char (1+ point))
+        (set-mark (1+ mark)))
+       ;; Create new selection for peer
+       ((not overlay)
+        (setq overlay (make-overlay (1+ point) (1+ mark)))
+        (overlay-put overlay 'face (c3edit--get-peer-face id))
+        (push `(,id . ,overlay) c3edit--cursors-alist))
+       (t
+        (move-overlay overlay (1+ point) (1+ mark)))))))
+
 (defun c3edit--handle-unset-mark (id peer-id)
   "Remove mark selection for PEER-ID in document ID."
   (let* ((data (rassoc id c3edit--buffers))
@@ -236,6 +256,8 @@ Processes message from TEXT."
            (c3edit--handle-join-document-response .id .current_content))
           ("set_cursor"
            (c3edit--handle-cursor-update .document_id .location .peer_id))
+          ("set_selection"
+           (c3edit--handle-selection-update .document_id .peer_id .point .mark))
           ("unset_mark"
            (c3edit--handle-unset-mark .document_id .peer_id))
           (_
