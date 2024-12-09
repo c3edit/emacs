@@ -188,29 +188,24 @@ alist."
             (1+ .index)
             (+ 1 .index .len))))))))
 
-(defun c3edit--handle-new-cursor-location (id position mark peer-id)
-  "Update cursor (mark if MARK) for PEER-ID in document ID to POSITION."
+(defun c3edit--handle-cursor-update (id point peer-id)
+  "Update cursor for PEER-ID in document ID for new POINT."
   (let* ((data (rassoc id c3edit--buffers))
          (buffer (car data))
          (id (cdr data))
-         (overlay (cdr (assoc id c3edit--cursors-alist)))
-         (fn (if mark #'set-mark #'goto-char)))
+         (overlay (cdr (assoc id c3edit--cursors-alist))))
     (with-current-buffer buffer
       (cond
        ;; Our cursor
        ((not peer-id)
-        (funcall fn (1+ position)))
+        (goto-char (1+ point)))
        ;; Create new cursor for peer
        ((not overlay)
-        (setq overlay (make-overlay (1+ position) (+ 2 position)))
+        (setq overlay (make-overlay (1+ point) (+ 2 point)))
         (overlay-put overlay 'face (c3edit--get-peer-face id))
-        (overlay-put overlay 'point (1+ position))
         (push `(,id . ,overlay) c3edit--cursors-alist))
-       ((eq mark :json-false)
-        (move-overlay overlay (1+ position) (+ 2 position))
-        (overlay-put overlay 'point (1+ position)))
        (t
-        (move-overlay overlay (overlay-get overlay 'point) position))))))
+        (move-overlay overlay (1+ point) (+ 2 point)))))))
 
 (defun c3edit--handle-unset-mark (id peer-id)
   "Remove mark selection for PEER-ID in document ID."
@@ -240,7 +235,7 @@ Processes message from TEXT."
           ("join_document_response"
            (c3edit--handle-join-document-response .id .current_content))
           ("set_cursor"
-           (c3edit--handle-new-cursor-location .document_id .location .mark .peer_id))
+           (c3edit--handle-cursor-update .document_id .location .peer_id))
           ("unset_mark"
            (c3edit--handle-unset-mark .document_id .peer_id))
           (_
