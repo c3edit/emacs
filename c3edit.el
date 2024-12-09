@@ -227,15 +227,6 @@ alist."
        (t
         (move-overlay overlay (1+ point) (1+ mark)))))))
 
-(defun c3edit--handle-unset-mark (id peer-id)
-  "Remove mark selection for PEER-ID in document ID."
-  (let* ((data (rassoc id c3edit--buffers))
-         (buffer (car data))
-         (overlay (cdr (assoc id c3edit--cursors-alist)))
-         (point (overlay-get overlay 'point)))
-    (with-current-buffer buffer
-      (move-overlay overlay point (1+ point)))))
-
 (defun c3edit--process-filter (_process text)
   "Process filter for c3edit backend messages.
 Processes message from TEXT."
@@ -258,8 +249,6 @@ Processes message from TEXT."
            (c3edit--handle-cursor-update .document_id .location .peer_id))
           ("set_selection"
            (c3edit--handle-selection-update .document_id .peer_id .point .mark))
-          ("unset_mark"
-           (c3edit--handle-unset-mark .document_id .peer_id))
           (_
            (display-warning
             'c3edit (format "Unknown message type: %s" .type) :warning)))))))
