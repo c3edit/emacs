@@ -276,13 +276,19 @@ BEG, END, and LEN are as documented in `after-change-functions'."
 
 ;; TODO Use local hooks instead of checking current buffer.
 (defun c3edit--post-command-function ()
-  "Update c3edit backend with cursor position after command execution."
+  "Update c3edit backend with cursor/selection after command execution."
   (when-let ((c3edit--process)
              (document-id (cdr (assoc (current-buffer) c3edit--buffers)))
              ((not (= c3edit--pre-command-point (point)))))
-    (c3edit--send-message `((type . "set_cursor")
-                            (document_id . ,document-id)
-                            (location . ,(1- (point)))))))
+    (c3edit--send-message
+     (if mark-active
+         `((type . "set_selection")
+           (document_id . ,document-id)
+           (point . ,(1- (point)))
+           (mark . ,(1- (mark))))
+       `((type . "set_cursor")
+         (document_id . ,document-id)
+         (location . ,(1- (point))))))))
 
 (defun c3edit--activate-mark-function ()
   "Update c3edit backend with mark position."
