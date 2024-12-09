@@ -300,11 +300,14 @@ BEG, END, and LEN are as documented in `after-change-functions'."
                             (mark . t)))))
 
 (defun c3edit--deactivate-mark-function ()
-  "Update c3edit backend with mark deactivation."
+  "Update c3edit backend on mark deactivation."
+  ;; TODO Refactor cursor update into separate function (duplicate from
+  ;; `c3edit--post-command-function' right now).
   (when-let ((c3edit--process)
              (document-id (cdr (assoc (current-buffer) c3edit--buffers))))
-    (c3edit--send-message `((type . "unset_mark")
-                            (document_id . ,document-id)))))
+    (c3edit--send-message `((type . "set_cursor")
+                            (document_id . ,document-id)
+                            (location . ,(1- (point)))))))
 
 (provide 'c3edit)
 
