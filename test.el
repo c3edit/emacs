@@ -14,5 +14,10 @@
             7000
           7001))
 
-(unless c3edit--process
-  (c3edit-start))
+(when c3edit--process
+  (c3edit-stop))
+
+(c3edit-start)
+(unless (bound-and-true-p server-process)
+  ;; Add the server as a peer
+  (c3edit-add-peer "localhost:7000"))
