@@ -110,7 +110,10 @@ Start as server if SERVER is non-nil."
   (interactive)
   (unless c3edit--process
     (user-error "Backend for c3edit is not running"))
-  (kill-process c3edit--process)
+  ;; In case the process crashed, ignore errors.
+  ;; TODO Ignore the specific error only.
+  (ignore-errors
+    (kill-process c3edit--process))
   (setq c3edit--process nil
         c3edit--buffers nil
         c3edit--cursors-alist nil)
