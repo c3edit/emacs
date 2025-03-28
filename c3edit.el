@@ -82,11 +82,6 @@ cursor overlay.")
   "Whether current changes being inserted are from backend.
 Dynamically-scoped variable to prevent infinitely-recursing changes.")
 
-(defsubst c3edit--send-message (message)
-  "Serialize MESSAGE into JSON and send it to the c3edit backend."
-  (process-send-string
-   c3edit--process (concat (json-serialize message) "\n")))
-
 (defun c3edit-start ()
   "Start the c3edit backend.
 Start as server if SERVER is non-nil."
@@ -141,6 +136,11 @@ When called interactively, BUFFER is the current buffer."
   (c3edit--send-message `((type . "join_document")
                           (id . ,id))))
 
+(defsubst c3edit--send-message (message)
+  "Serialize MESSAGE into JSON and send it to the c3edit backend."
+  (process-send-string
+   c3edit--process (concat (json-serialize message) "\n")))
+
 (defun c3edit--json-read-all (string)
   "Read all JSON objects from STRING.
 Returns list of read objects."
@@ -156,6 +156,32 @@ Returns list of read objects."
                   data))
         (json-end-of-file)))
     (nreverse data)))
+
+(defun c3edit--process-filter (_process text)
+  "Process filter for c3edit backend messages.
+Processes message from TEXT."
+  ;; Emacs process handling may return many lines at once, we have to make sure
+  ;; to read them all in order.
+  (let* ((data (c3edit--json-read-all text))
+         (c3edit--synced-changes-p t))
+    (dolist (message data)
+      (let-alist message
+        (pcase .type
+          ("change"
+           (c3edit--handle-change .document_id .change))
+          ("add_peer_response"
+           (message "Successfully added peer at %s" .address))
+          ("create_document_response"
+           (c3edit--handle-create-document-response .id))
+          ("join_document_response"
+           (c3edit--handle-join-document-response .id .current_content))
+          ("set_cursor"
+           (c3edit--handle-cursor-update .document_id .location .peer_id))
+          ("set_selection"
+           (c3edit--handle-selection-update .document_id .peer_id .point .mark))
+          (_
+           (display-warning
+            'c3edit (format "Unknown message type: %s" .type) :warning)))))))
 
 (defun c3edit--get-peer-face (document-id)
   "Return a face for a new peer in DOCUMENT-ID."
@@ -240,32 +266,6 @@ alist."
         (push `(,id . ,overlay) c3edit--cursors-alist))
        (t
         (move-overlay overlay (1+ point) (1+ mark)))))))
-
-(defun c3edit--process-filter (_process text)
-  "Process filter for c3edit backend messages.
-Processes message from TEXT."
-  ;; Emacs process handling may return many lines at once, we have to make sure
-  ;; to read them all in order.
-  (let* ((data (c3edit--json-read-all text))
-         (c3edit--synced-changes-p t))
-    (dolist (message data)
-      (let-alist message
-        (pcase .type
-          ("change"
-           (c3edit--handle-change .document_id .change))
-          ("add_peer_response"
-           (message "Successfully added peer at %s" .address))
-          ("create_document_response"
-           (c3edit--handle-create-document-response .id))
-          ("join_document_response"
-           (c3edit--handle-join-document-response .id .current_content))
-          ("set_cursor"
-           (c3edit--handle-cursor-update .document_id .location .peer_id))
-          ("set_selection"
-           (c3edit--handle-selection-update .document_id .peer_id .point .mark))
-          (_
-           (display-warning
-            'c3edit (format "Unknown message type: %s" .type) :warning)))))))
 
 (defun c3edit--after-change-function (beg end len)
   "Update c3edit backend after a change to buffer.
