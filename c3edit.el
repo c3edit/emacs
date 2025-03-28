@@ -101,9 +101,7 @@ Start as server if SERVER is non-nil."
                            :command command
                            :connection-type 'pipe
                            :filter #'c3edit--process-filter
-                           :stderr (get-buffer-create "*c3edit log*"))))
-  (cl-loop for (hook . function) in c3edit--hooks
-           do (add-hook hook function)))
+                           :stderr (get-buffer-create "*c3edit log*")))))
 
 (defun c3edit-stop ()
   "Kill c3edit backend."
@@ -114,11 +112,12 @@ Start as server if SERVER is non-nil."
   ;; TODO Ignore the specific error only.
   (ignore-errors
     (kill-process c3edit--process))
+  (cl-loop for (buffer . _id) in c3edit--buffers
+           do (cl-loop for (hook . function) in c3edit--hooks
+                       do (remove-hook hook function 'local)))
   (setq c3edit--process nil
         c3edit--buffers nil
-        c3edit--cursors-alist nil)
-  (cl-loop for (hook . function) in c3edit--hooks
-           do (remove-hook hook function)))
+        c3edit--cursors-alist nil))
 
 (defun c3edit-add-peer (address)
   "Add a peer at ADDRESS."
@@ -169,6 +168,9 @@ Returns list of read objects."
   (push `(,c3edit--currently-creating-buffer . ,id)
         c3edit--buffers)
   (push `(,id . nil) c3edit--cursors-alist)
+  (with-current-buffer c3edit--currently-creating-buffer
+    (cl-loop for (hook . function) in c3edit--hooks
+             do (add-hook hook function nil 'local)))
   (message "Document created with ID %s" id))
 
 (defun c3edit--handle-join-document-response (id content)
@@ -176,7 +178,9 @@ Returns list of read objects."
   (let ((buffer (get-buffer-create id)))
     (with-current-buffer buffer
       (erase-buffer)
-      (insert content))
+      (insert content)
+      (cl-loop for (hook . function) in c3edit--hooks
+               do (add-hook hook function nil 'local)))
     (push `(,buffer . ,id) c3edit--buffers)
     (push `(,id . nil) c3edit--cursors-alist)
     (pop-to-buffer buffer)
@@ -284,7 +288,6 @@ BEG, END, and LEN are as documented in `after-change-functions'."
   "Store pre-command cursor position."
   (setq c3edit--pre-command-point (point)))
 
-;; TODO Use local hooks instead of checking current buffer.
 (defun c3edit--post-command-function ()
   "Update c3edit backend with cursor/selection after command execution."
   (when-let ((c3edit--process)
