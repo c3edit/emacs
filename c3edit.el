@@ -27,6 +27,8 @@
 
 ;;; Code:
 
+(eval-when-compile
+  (require 'cl-lib))
 (require 'map)
 (require 'ansi-color)
 
@@ -48,6 +50,14 @@
     ansi-color-blue
     ansi-color-green)
   "List of faces to use for peer cursor/selection colors.")
+
+(defconst c3edit--hooks
+  '((pre-command-hook . c3edit--pre-command-function)
+    (post-command-hook . c3edit--post-command-function)
+    (after-change-functions . c3edit--after-change-function)
+    (activate-mark-hook . c3edit--activate-mark-function)
+    (deactivate-mark-hook . c3edit--deactivate-mark-function))
+  "Alist of hooks to add and remove for document buffers.")
 
 (defvar c3edit--process nil
   "Process for c3edit backend.")
@@ -92,11 +102,8 @@ Start as server if SERVER is non-nil."
                            :connection-type 'pipe
                            :filter #'c3edit--process-filter
                            :stderr (get-buffer-create "*c3edit log*"))))
-  (add-hook 'after-change-functions #'c3edit--after-change-function)
-  (add-hook 'post-command-hook #'c3edit--post-command-function)
-  (add-hook 'pre-command-hook #'c3edit--pre-command-function)
-  (add-hook 'activate-mark-hook #'c3edit--activate-mark-function)
-  (add-hook 'deactivate-mark-hook #'c3edit--deactivate-mark-function))
+  (cl-loop for (hook . function) in c3edit--hooks
+           do (add-hook hook function)))
 
 (defun c3edit-stop ()
   "Kill c3edit backend."
@@ -107,10 +114,8 @@ Start as server if SERVER is non-nil."
   (setq c3edit--process nil
         c3edit--buffers nil
         c3edit--cursors-alist nil)
-  (remove-hook 'after-change-functions #'c3edit--after-change-function)
-  (remove-hook 'post-command-hook #'c3edit--post-command-function)
-  (remove-hook 'pre-command-hook #'c3edit--pre-command-function)
-  (remove-hook 'activate-mark-hook #'c3edit--activate-mark-function))
+  (cl-loop for (hook . function) in c3edit--hooks
+           do (remove-hook hook function)))
 
 (defun c3edit-add-peer (address)
   "Add a peer at ADDRESS."
