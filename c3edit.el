@@ -2,7 +2,7 @@
 
 ;; Author: Adam Zhang <898544@lcps.org>
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "25.1"))
+;; Package-Requires: ((emacs "27.1"))
 ;; Homepage: https://github.com/adam-zhang-lcps/c3edit
 
 ;; This file is not part of GNU Emacs
@@ -27,7 +27,6 @@
 
 ;;; Code:
 
-(require 'json)
 (require 'map)
 (require 'ansi-color)
 
@@ -76,7 +75,7 @@ Dynamically-scoped variable to prevent infinitely-recursing changes.")
 (defsubst c3edit--send-message (message)
   "Serialize MESSAGE into JSON and send it to the c3edit backend."
   (process-send-string
-   c3edit--process (concat (json-encode message) "\n")))
+   c3edit--process (concat (json-serialize message) "\n")))
 
 (defun c3edit-start ()
   "Start the c3edit backend.
@@ -144,7 +143,10 @@ Returns list of read objects."
       (goto-char (point-min))
       (condition-case _err
           (while t
-            (push (json-read) data))
+            (push (json-parse-buffer
+                   :object-type 'alist
+                   :array-type 'list)
+                  data))
         (json-end-of-file)))
     (nreverse data)))
 
